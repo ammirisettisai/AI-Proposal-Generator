@@ -1,0 +1,19 @@
+# Protect secrets
+**/.env
+**/.env.*
+!.env.example
+**/token.json
+**/credentials.json
+
+# Python
+**/venv/
+**/.venv/
+**/__pycache__/
+*.pyc
+
+# Node
+**/node_modules/
+frontend/dist/
+
+# IDE
+.vscode/
