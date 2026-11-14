@@ -1,40 +1,58 @@
 
 import os
+import ssl
+
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
-from sqlalchemy.engine import URL
-
-# Load environment variables
-load_dotenv()
-
-# Read database settings
-db_password = os.getenv("DB_PASSWORD")
-import os
-from dotenv import load_dotenv
-from sqlalchemy import create_engine, text
-from sqlalchemy.engine import URL
+from sqlalchemy.engine import URL, make_url
 from sqlalchemy.orm import declarative_base
 
 load_dotenv()
 
-db_password = os.getenv("DB_PASSWORD")
+# Read the cloud database URL from Vercel or local .env
+database_url = os.getenv("DATABASE_URL")
 
-if not db_password:
-    raise RuntimeError("DB_PASSWORD is missing from the .env file")
+if database_url:
+    # Use pg8000 with Neon PostgreSQL
+    url = make_url(database_url).set(
+        drivername="postgresql+pg8000",
+        query={}
+    )
 
-database_url = URL.create(
-    drivername="postgresql+pg8000",
-    username=os.getenv("DB_USER", "postgres"),
-    password=db_password,
-    host=os.getenv("DB_HOST", "localhost"),
-    port=int(os.getenv("DB_PORT", "5432")),
-    database=os.getenv("DB_NAME", "proposalai_db")
-)
+    engine = create_engine(
+        url,
+        connect_args={
+            "ssl_context": ssl.create_default_context()
+        },
+        pool_pre_ping=True,
+        pool_size=1,
+        max_overflow=0
+    )
 
-engine = create_engine(
-    database_url,
-    pool_pre_ping=True
-)
+else:
+    # Local PostgreSQL fallback
+    db_password = os.getenv("DB_PASSWORD")
+
+    if not db_password:
+        raise RuntimeError(
+            "DATABASE_URL or DB_PASSWORD is missing"
+        )
+
+    local_url = URL.create(
+        drivername="postgresql+pg8000",
+        username=os.getenv("DB_USER", "postgres"),
+        password=db_password,
+        host=os.getenv("DB_HOST", "localhost"),
+        port=int(os.getenv("DB_PORT", "5432")),
+        database=os.getenv("DB_NAME", "proposalai_db")
+    )
+
+    engine = create_engine(
+        local_url,
+        pool_pre_ping=True,
+        pool_size=1,
+        max_overflow=0
+    )
 
 Base = declarative_base()
 

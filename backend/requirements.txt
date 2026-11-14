@@ -1,0 +1,13 @@
+
+fastapi
+uvicorn
+python-dotenv
+sqlalchemy
+pg8000
+google-genai
+google-auth
+google-auth-oauthlib
+google-auth-httplib2
+google-api-python-client
+reportlab
+pydantic

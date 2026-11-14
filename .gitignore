@@ -9,3 +9,4 @@
 **/node_modules/
 frontend/dist/
 .vscode/
+**/client_secret*.json
