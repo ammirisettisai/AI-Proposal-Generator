@@ -88,10 +88,6 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    
-
-app.add_middleware(
-    CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
         "http://127.0.0.1:5173",
@@ -733,7 +729,7 @@ def send_proposal_email(
     if not client_request:
         raise HTTPException(
             status_code=404,
-            detail="Client request not found"
+            detail="Request not found"
         )
 
     if not client_request.email:
@@ -811,5 +807,3 @@ AI Proposal Generator
             status_code=500,
             detail=f"Gmail sending failed: {str(error)}"
         )
-
-
