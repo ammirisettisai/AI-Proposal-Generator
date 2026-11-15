@@ -34,6 +34,8 @@ from models import EmailRequest
 
 from gmail_service import (
     create_oauth_flow,
+    save_oauth_session,
+    delete_oauth_session,
     save_credentials,
     get_gmail_service,
 )
@@ -46,6 +48,11 @@ from gmail_service import (
 load_dotenv(override=True)
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+GOOGLE_REDIRECT_URI = os.getenv(
+    "GOOGLE_REDIRECT_URI",
+    "https://ai-proposal-generator-backend.vercel.app/auth/gmail/callback"
+)
 
 gemini_client = (
     genai.Client(api_key=GEMINI_API_KEY)
@@ -100,13 +107,6 @@ app.add_middleware(
 
 
 # --------------------------------------------------
-# GMAIL OAUTH STATE
-# --------------------------------------------------
-
-gmail_oauth_state = None
-
-
-# --------------------------------------------------
 # PYDANTIC SCHEMAS
 # --------------------------------------------------
 
@@ -152,7 +152,7 @@ def get_gemini_client():
     if gemini_client is None:
         raise HTTPException(
             status_code=500,
-            detail="GEMINI_API_KEY is missing from the .env file."
+            detail="GEMINI_API_KEY is missing from the environment."
         )
     return gemini_client
 
@@ -428,9 +428,7 @@ def delete_request(
 # --------------------------------------------------
 
 @app.post("/api/extract-email")
-def extract_email(
-    email_data: EmailContent
-):
+def extract_email(email_data: EmailContent):
 
     client = get_gemini_client()
 
@@ -639,20 +637,21 @@ def generate_proposal_pdf(
 @app.get("/auth/gmail/login")
 def gmail_login():
 
-    global gmail_oauth_state
-
     try:
-        flow = create_oauth_flow()
-
-        authorization_url, state = (
-            flow.authorization_url(
-                access_type="offline",
-                include_granted_scopes="true",
-                prompt="consent"
-            )
+        flow = create_oauth_flow(
+            redirect_uri=GOOGLE_REDIRECT_URI
         )
 
-        gmail_oauth_state = state
+        authorization_url, state = flow.authorization_url(
+            access_type="offline",
+            include_granted_scopes="true",
+            prompt="consent"
+        )
+
+        save_oauth_session(
+            state=state,
+            code_verifier=flow.code_verifier
+        )
 
         return RedirectResponse(
             authorization_url
@@ -675,16 +674,17 @@ def gmail_callback(
     state: str | None = None
 ):
 
-    global gmail_oauth_state
-
     try:
-        if not state or state != gmail_oauth_state:
+        if not state:
             raise HTTPException(
                 status_code=400,
-                detail="Invalid Gmail OAuth state. Please log in again."
+                detail="OAuth state is missing. Please log in again."
             )
 
-        flow = create_oauth_flow(state=state)
+        flow = create_oauth_flow(
+            redirect_uri=GOOGLE_REDIRECT_URI,
+            state=state
+        )
 
         flow.fetch_token(
             authorization_response=str(request.url)
@@ -692,7 +692,7 @@ def gmail_callback(
 
         save_credentials(flow.credentials)
 
-        gmail_oauth_state = None
+        delete_oauth_session()
 
         return {
             "message": "Gmail authorization successful!"
@@ -787,7 +787,6 @@ AI Proposal Generator
             .execute()
         )
 
-        # Update status only after Gmail confirms sending
         client_request.status = "Sent"
 
         db.commit()
