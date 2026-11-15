@@ -6,14 +6,14 @@ from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import URL, make_url
 from sqlalchemy.orm import declarative_base
+from sqlalchemy.pool import NullPool
 
 load_dotenv()
 
-# Read the cloud database URL from Vercel or local .env
 database_url = os.getenv("DATABASE_URL")
 
 if database_url:
-    # Use pg8000 with Neon PostgreSQL
+    # Neon PostgreSQL cloud database
     url = make_url(database_url).set(
         drivername="postgresql+pg8000",
         query={}
@@ -24,9 +24,8 @@ if database_url:
         connect_args={
             "ssl_context": ssl.create_default_context()
         },
-        pool_pre_ping=True,
-        pool_size=1,
-        max_overflow=0
+        poolclass=NullPool,
+        pool_pre_ping=True
     )
 
 else:
@@ -50,8 +49,7 @@ else:
     engine = create_engine(
         local_url,
         pool_pre_ping=True,
-        pool_size=1,
-        max_overflow=0
+        poolclass=NullPool
     )
 
 Base = declarative_base()
